@@ -251,6 +251,7 @@ class TrainBase:
         """
         Save model and plot loss and performance
         """
+        print(f'SAVING... {os.path.join(self.save_path, self.save_model_name)}')
         torch.save(
             self.net, os.path.join(self.save_path, self.save_model_name)
         ) 

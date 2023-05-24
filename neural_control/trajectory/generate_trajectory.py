@@ -12,6 +12,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ExpSineSquared
 from tqdm import tqdm
 
+from quadsim.learning.refs.random_zigzag import RandomZigzag
+
 from neural_control.trajectory.q_funcs import (
     q_dot_q,
     quaternion_inverse,
@@ -340,129 +342,141 @@ def compute_random_trajectory(
 
     # kernel to map functions that repeat exactly
     # print("seed is: %d" % seed)
-    kernel_y = (
-        ExpSineSquared(length_scale=freq_x, periodicity=17)
-        + ExpSineSquared(length_scale=3.0, periodicity=23)
-        + ExpSineSquared(length_scale=4.0, periodicity=51)
-    )
-    kernel_x = (
-        ExpSineSquared(length_scale=freq_y, periodicity=37)
-        + ExpSineSquared(length_scale=3.0, periodicity=61)
-        + ExpSineSquared(length_scale=4.0, periodicity=13)
-    )
-    kernel_z = (
-        ExpSineSquared(length_scale=freq_z, periodicity=19)
-        + ExpSineSquared(length_scale=3.0, periodicity=29)
-        + ExpSineSquared(length_scale=4.0, periodicity=53)
-    )
+    # kernel_y = (
+    #     ExpSineSquared(length_scale=freq_x, periodicity=17)
+    #     + ExpSineSquared(length_scale=3.0, periodicity=23)
+    #     + ExpSineSquared(length_scale=4.0, periodicity=51)
+    # )
+    # kernel_x = (
+    #     ExpSineSquared(length_scale=freq_y, periodicity=37)
+    #     + ExpSineSquared(length_scale=3.0, periodicity=61)
+    #     + ExpSineSquared(length_scale=4.0, periodicity=13)
+    # )
+    # kernel_z = (
+    #     ExpSineSquared(length_scale=freq_z, periodicity=19)
+    #     + ExpSineSquared(length_scale=3.0, periodicity=29)
+    #     + ExpSineSquared(length_scale=4.0, periodicity=53)
+    # )
 
-    gp_x = GaussianProcessRegressor(kernel=kernel_x)
-    gp_y = GaussianProcessRegressor(kernel=kernel_y)
-    gp_z = GaussianProcessRegressor(kernel=kernel_z)
+    # gp_x = GaussianProcessRegressor(kernel=kernel_x)
+    # gp_y = GaussianProcessRegressor(kernel=kernel_y)
+    # gp_z = GaussianProcessRegressor(kernel=kernel_z)
 
-    t_coarse = np.linspace(0.0, duration, int(duration / 0.1), endpoint=False)
+    # t_coarse = np.linspace(0.0, duration, int(duration / 0.1), endpoint=False)
     t_vec, dt = np.linspace(
         0.0, duration, int(duration / dt), endpoint=False, retstep=True
     )
 
-    t = cs.MX.sym("t")
-    # t_speed is a function starting at zero and ending at zero that
-    # modulates time
-    # casadi cannot do symbolic integration --> write down the integrand by
-    # hand of 2.0*sin^2(t)
-    # t_adj = 2.0 * (t / 2.0 - cs.sin(2.0 / duration * cs.pi * t) /
-    # (4.0 * cs.pi / duration))
-    tau = t / duration
-    t_adj = (
-        1.524
-        * duration
-        * (
-            -(
-                8 * cs.cos(tau * cs.pi) * cs.constpow(cs.sin(tau * cs.pi), 5)
-                + 10 * cs.cos(tau * cs.pi) * cs.constpow(cs.sin(tau * cs.pi), 3)
-                + 39 * cs.sin(tau * cs.pi) * cs.cos(tau * cs.pi)
-                + 12 * cs.sin(2 * tau * cs.pi) * cs.cos(2 * tau * cs.pi)
-                - 63 * tau * cs.pi
-            )
-            / (96 * cs.pi)
-        )
-    )
+    # t = cs.MX.sym("t")
+    # # t_speed is a function starting at zero and ending at zero that
+    # # modulates time
+    # # casadi cannot do symbolic integration --> write down the integrand by
+    # # hand of 2.0*sin^2(t)
+    # # t_adj = 2.0 * (t / 2.0 - cs.sin(2.0 / duration * cs.pi * t) /
+    # # (4.0 * cs.pi / duration))
+    # tau = t / duration
+    # t_adj = (
+    #     1.524
+    #     * duration
+    #     * (
+    #         -(
+    #             8 * cs.cos(tau * cs.pi) * cs.constpow(cs.sin(tau * cs.pi), 5)
+    #             + 10 * cs.cos(tau * cs.pi) * cs.constpow(cs.sin(tau * cs.pi), 3)
+    #             + 39 * cs.sin(tau * cs.pi) * cs.cos(tau * cs.pi)
+    #             + 12 * cs.sin(2 * tau * cs.pi) * cs.cos(2 * tau * cs.pi)
+    #             - 63 * tau * cs.pi
+    #         )
+    #         / (96 * cs.pi)
+    #     )
+    # )
 
-    f_t_adj = cs.Function("t_adj", [t], [t_adj])
-    scaled_time = f_t_adj(t_vec)
+    # f_t_adj = cs.Function("t_adj", [t], [t_adj])
+    # scaled_time = f_t_adj(t_vec)
 
-    # print("sampling x...")
-    x_sample_hr = gp_x.sample_y(t_coarse[:, np.newaxis], 1, random_state=seed)
-    # print("sampling y...")
-    y_sample_hr = gp_y.sample_y(t_coarse[:, np.newaxis], 1, random_state=seed + 1)
-    # print("sampling z...")
-    z_sample_hr = gp_z.sample_y(t_coarse[:, np.newaxis], 1, random_state=seed + 2)
+    # # print("sampling x...")
+    # x_sample_hr = gp_x.sample_y(t_coarse[:, np.newaxis], 1, random_state=seed)
+    # # print("sampling y...")
+    # y_sample_hr = gp_y.sample_y(t_coarse[:, np.newaxis], 1, random_state=seed + 1)
+    # # print("sampling z...")
+    # z_sample_hr = gp_z.sample_y(t_coarse[:, np.newaxis], 1, random_state=seed + 2)
 
-    pos_np = np.concatenate([x_sample_hr, y_sample_hr, z_sample_hr], axis=1)
-    # scale to arena bounds
-    max_traj = np.max(pos_np, axis=0)
-    min_traj = np.min(pos_np, axis=0)
-    pos_centered = pos_np - (max_traj + min_traj) / 2.0
-    pos_scaled = (
-        pos_centered * (arena_bound_max - arena_bound_min) / (max_traj - min_traj)
-    )
-    pos_arena = pos_scaled + (arena_bound_max + arena_bound_min) / 2.0
+    # pos_np = np.concatenate([x_sample_hr, y_sample_hr, z_sample_hr], axis=1)
+    # # scale to arena bounds
+    # max_traj = np.max(pos_np, axis=0)
+    # min_traj = np.min(pos_np, axis=0)
+    # pos_centered = pos_np - (max_traj + min_traj) / 2.0
+    # pos_scaled = (
+    #     pos_centered * (arena_bound_max - arena_bound_min) / (max_traj - min_traj)
+    # )
+    # pos_arena = pos_scaled + (arena_bound_max + arena_bound_min) / 2.0
 
-    if debug:
-        plt.plot(pos_arena[:, 0], label="x")
-        plt.plot(pos_arena[:, 1], label="y")
-        plt.plot(pos_arena[:, 2], label="z")
-        plt.legend()
-        plt.show()
+    # if debug:
+    #     plt.plot(pos_arena[:, 0], label="x")
+    #     plt.plot(pos_arena[:, 1], label="y")
+    #     plt.plot(pos_arena[:, 2], label="z")
+    #     plt.legend()
+    #     plt.show()
 
-    # rescale time to get smooth start and end states
-    pos_blub_x = interpolate.interp1d(
-        t_coarse, pos_arena[:, 0], kind="cubic", fill_value="extrapolate"
-    )
-    pos_blub_y = interpolate.interp1d(
-        t_coarse, pos_arena[:, 1], kind="cubic", fill_value="extrapolate"
-    )
-    pos_blub_z = interpolate.interp1d(
-        t_coarse, pos_arena[:, 2], kind="cubic", fill_value="extrapolate"
-    )
-    pos_arena = np.concatenate(
-        [pos_blub_x(scaled_time), pos_blub_y(scaled_time), pos_blub_z(scaled_time)],
-        axis=1,
-    )
+    # # rescale time to get smooth start and end states
+    # pos_blub_x = interpolate.interp1d(
+    #     t_coarse, pos_arena[:, 0], kind="cubic", fill_value="extrapolate"
+    # )
+    # pos_blub_y = interpolate.interp1d(
+    #     t_coarse, pos_arena[:, 1], kind="cubic", fill_value="extrapolate"
+    # )
+    # pos_blub_z = interpolate.interp1d(
+    #     t_coarse, pos_arena[:, 2], kind="cubic", fill_value="extrapolate"
+    # )
+    # pos_arena = np.concatenate(
+    #     [pos_blub_x(scaled_time), pos_blub_y(scaled_time), pos_blub_z(scaled_time)],
+    #     axis=1,
+    # )
 
-    pos_arena = np.concatenate(
-        [
-            smooth(np.squeeze(pos_arena[:, 0]), window_len=11)[:, np.newaxis],
-            smooth(np.squeeze(pos_arena[:, 1]), window_len=11)[:, np.newaxis],
-            smooth(np.squeeze(pos_arena[:, 2]), window_len=11)[:, np.newaxis],
-        ],
-        axis=1,
-    )
+    # pos_arena = np.concatenate(
+    #     [
+    #         smooth(np.squeeze(pos_arena[:, 0]), window_len=11)[:, np.newaxis],
+    #         smooth(np.squeeze(pos_arena[:, 1]), window_len=11)[:, np.newaxis],
+    #         smooth(np.squeeze(pos_arena[:, 2]), window_len=11)[:, np.newaxis],
+    #     ],
+    #     axis=1,
+    # )
 
-    # compute numeric derivative & smooth things
-    vel_arena = np.gradient(pos_arena, axis=0) / dt
-    vel_arena = np.concatenate(
-        [
-            smooth(np.squeeze(vel_arena[:, 0]), window_len=11)[:, np.newaxis],
-            smooth(np.squeeze(vel_arena[:, 1]), window_len=11)[:, np.newaxis],
-            smooth(np.squeeze(vel_arena[:, 2]), window_len=11)[:, np.newaxis],
-        ],
-        axis=1,
-    )
-    acc_arena = np.gradient(vel_arena, axis=0) / dt
-    acc_arena = np.concatenate(
-        [
-            smooth(np.squeeze(acc_arena[:, 0]), window_len=11)[:, np.newaxis],
-            smooth(np.squeeze(acc_arena[:, 1]), window_len=11)[:, np.newaxis],
-            smooth(np.squeeze(acc_arena[:, 2]), window_len=11)[:, np.newaxis],
-        ],
-        axis=1,
-    )
+    # # compute numeric derivative & smooth things
+    # vel_arena = np.gradient(pos_arena, axis=0) / dt
+    # vel_arena = np.concatenate(
+    #     [
+    #         smooth(np.squeeze(vel_arena[:, 0]), window_len=11)[:, np.newaxis],
+    #         smooth(np.squeeze(vel_arena[:, 1]), window_len=11)[:, np.newaxis],
+    #         smooth(np.squeeze(vel_arena[:, 2]), window_len=11)[:, np.newaxis],
+    #     ],
+    #     axis=1,
+    # )
+    # acc_arena = np.gradient(vel_arena, axis=0) / dt
+    # acc_arena = np.concatenate(
+    #     [
+    #         smooth(np.squeeze(acc_arena[:, 0]), window_len=11)[:, np.newaxis],
+    #         smooth(np.squeeze(acc_arena[:, 1]), window_len=11)[:, np.newaxis],
+    #         smooth(np.squeeze(acc_arena[:, 2]), window_len=11)[:, np.newaxis],
+    #     ],
+    #     axis=1,
+    # )
     t_np = t_vec
 
+    ref = RandomZigzag(seed=np.random.randint(1000000), max_D=np.array([1, 1, 0]))
+
+    pos_arena = ref.pos(t_np).T
+    vel_arena = ref.vel(t_np).T
+    acc_arena = ref.acc(t_np).T
     trajectory, motor_inputs, t_vec = compute_full_traj(
         quad, t_np, pos_arena, vel_arena, acc_arena
     )
+
+    if debug:
+        plt.plot(t_vec, trajectory[:, 0], label='x')
+        plt.plot(t_vec, trajectory[:, 1], label='y')
+        plt.plot(t_vec, trajectory[:, 2], label='z')
+        plt.legend()
+        plt.show()
 
     return trajectory, motor_inputs, t_vec
 
@@ -655,3 +669,6 @@ def make_dataset():
 
     with open(os.path.join(config["out_dir"], "config.json"), "w") as outfile:
         json.dump(config, outfile)
+
+if __name__ == "__main__":
+    make_dataset()

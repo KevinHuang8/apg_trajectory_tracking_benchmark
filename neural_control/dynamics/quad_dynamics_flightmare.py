@@ -3,6 +3,16 @@ import numpy as np
 from neural_control.dynamics.quad_dynamics_base import Dynamics
 import casadi as ca
 
+from quadsim.sim import QuadSim
+from quadsim.models import RBModel
+from scipy.spatial.transform import Rotation as R
+
+class State:
+  def __init__(self, pos=np.zeros(3), vel=np.zeros(3), rot=R.identity(), ang=np.zeros(3)):
+    self.pos = pos # R^3
+    self.vel = vel # R^3
+    self.rot = rot # Scipy Rotation rot.as_matrix() rot.as_quat()
+    self.ang = ang # R^3
 
 class FlightmareDynamics(Dynamics):
 
@@ -36,6 +46,13 @@ class FlightmareDynamics(Dynamics):
                 ]
             ), 1
         )
+
+        self.model = RBModel(
+            mass=self.mass, 
+            I=self.torch_inertia_J.cpu().numpy(),
+            g=9.8
+        )
+        self.quadsim = QuadSim(self.model, vis=False)
 
     def thrust_to_omega(self, thrusts):
         scale = 1.0 / (2.0 * self.thrust_map[0])
@@ -124,6 +141,21 @@ class FlightmareDynamics(Dynamics):
 
     def __call__(self, state, action, dt):
         return self.simulate_quadrotor(action, state, dt)
+    
+    # def simulate_quadrotor2(self, action, state, dt):
+    #     # extract state
+    #     position = state[:, :3]
+    #     attitude = state[:, 3:6]
+    #     velocity = state[:, 6:9]
+    #     angular_velocity = state[:, 9:]
+
+    #     # action is normalized between 0 and 1 --> rescale
+    #     total_thrust = action[:, 0] * 15 - 7.5 + 9.81
+    #     body_rates = action[:, 1:] - .5
+
+    #     rot = R.from_euler('XYZ', attitude.cpu().numpy())
+
+    #     sim_state = State(position.cpu().numpy(), velocity.cpu().numpy(), )
 
     def simulate_quadrotor(self, action, state, dt):
         """
@@ -208,7 +240,6 @@ class FlightmareDynamics(Dynamics):
         # pretty_print("attitude before", attitude)
 
         attitude = attitude + dt * self.euler_rate(attitude, angular_velocity)
-
         # set final state
         state = torch.hstack(
             (position, attitude, velocity, new_angular_velocity)
