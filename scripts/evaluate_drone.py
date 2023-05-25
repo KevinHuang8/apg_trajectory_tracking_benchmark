@@ -365,6 +365,7 @@ if __name__ == "__main__":
 
     # CONTROLLER - define and load controller
     model_path = os.path.join("trained_models", "quad", args.model)
+
     # MPC
     if model_path.split(os.sep)[-1] == "mpc":
         # mpc parameters:
@@ -373,6 +374,7 @@ if __name__ == "__main__":
     # Neural controller
     else:
         controller, params = load_model(model_path, epoch=args.epoch)
+
 
     # PARAMETERS
     params["render"] = 0
@@ -448,6 +450,7 @@ if __name__ == "__main__":
             drone_traj
         )
     print("Average divergence", np.mean(divergences))
+
     if args.animate:
         animate_quad(
             reference_traj,
